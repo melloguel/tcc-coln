@@ -10,16 +10,19 @@ import pandas as pd
 # import numpy as np
 from sklearn.model_selection import train_test_split
 
+def union_dfs(dfs):
+    df = pd.concat(dfs, ignore_index=True)
+    df = df.drop_duplicates()
+    df.reset_index(drop=True, inplace=True)
+    return df
+
 def fetch_all_data(path="./metadata"):
     """
     Load shattered metadata from path
     """
     p   = Path(path)
     dfs = [ pd.read_csv(m) for m in p.iterdir() if m.is_file() ]
-    df  = pd.concat(dfs, ignore_index=True)
-    df  = df.drop_duplicates()
-    df.reset_index(drop=True, inplace=True)
-    return df
+    return union_dfs(dfs)
 
 def split_in(df, samples=2):
     """
@@ -58,24 +61,29 @@ def tvt_split(dfs, tp, vp, seed):
                 }
         yield split
 
-def write_metadata(splits, template):
+def write_metadata(splits, template, cols=None):
     """
         spltis: List[dicts]
         template: directory prefix
+        cols:     columns that should be written
     """
-    name =  "./" + template + '-'
+    name =  "./" + template
+    Path(name).mkdir(parents=True, exist_ok=True)
     metadata_paths = []
     for i, split in enumerate(splits):
-        cname  = name + str(i)
+        cname  = name + '/part-' + str(i)
         cfname = cname + '/' + 'metadata_'
         Path(cname).mkdir(parents=True, exist_ok=True)
         paths = dict()
         for data in ['train', 'eval', 'test']:
             final_name = cfname + data + '.csv'
-            split[data].to_csv(final_name, index=False)
+            if cols is not None:
+                split[data].to_csv(final_name, index=False, columns=cols)
+            else:
+                split[data].to_csv(final_name, index=False)
             paths[data] = str(Path(final_name).resolve())
 
-        metadata_paths.append((str(Path(cname).resolve()), paths))
+        metadata_paths.append((cname, paths))
         print("wrote:", str(Path(cname).resolve()))
 
     return metadata_paths
@@ -84,7 +92,7 @@ def split_by(df, column, value, percent=0.8):
     indexes  = list(df.loc[df[column] == value].index)
     nindex   = len(indexes)
     chunk = floor(0.80 * (df[column] == value).sum())
-
+    print("chunk =", chunk)
     random.shuffle(indexes)
     res = []
     for i in indexes:
@@ -99,10 +107,33 @@ def split_by(df, column, value, percent=0.8):
     # random.sample()
     # return "Not implemented"
 
-def split_by2(df, yep):
-    pass
+def split_in2_by(df, column, value):
+    indexes = list(df.index)
+    hv      = list(df.loc[df[column] == value].index)
+    x       = df.iloc[list(hv)].reset_index()
+    xs      = df.iloc[list(set(indexes).difference(set(hv)))].reset_index()
+    return x, xs
 
-def create_config(cfg_path, metadata_paths, dataset_path):
+def shuffle_and_mix(x, y, p=0.5):
+    assert 0 < p < 1, "0 < p < 1, but got {}".format(p)
+    x_id = list(x.index)
+    y_id = list(y.index)
+
+    m = floor(p*len(x_id))
+
+    much_x = list(random.sample(x_id, m))
+    much_y = list(random.sample(y_id, m))
+
+    xp     = x.iloc[much_x].reset_index()
+    xs     = x.iloc[list(set(x_id).difference(set(much_x)))].reset_index()
+
+    yp     = y.iloc[much_y].reset_index()
+    ys     = y.iloc[list(set(y_id).difference(set(much_y)))].reset_index()
+
+    return [union_dfs([xp, ys]), union_dfs([yp, xs])]
+
+
+def create_config(cfg_path, metadata_paths, dataset_path, log_path):
     """
     Create config from template, so it can use the new metada data
     cfg_path : str, where config.json is
@@ -118,16 +149,20 @@ def create_config(cfg_path, metadata_paths, dataset_path):
     cfg = json.loads(input_str)
 
     for dname, paths in metadata_paths:
+
+        tcf = cfg['train_config'].copy()
+        tcf['logs_path'] = log_path + dname[1:] + f"/{cfg['seed']}/"
         dts = cfg['dataset'].copy()
         for e in ['train', 'eval', 'test']:
             dts[e + '_csv'] = paths[e]
-            dts[e + '_data_root_path'] = dataset_path
+            dts[e + '_data_root_path'] = dataset_path + '/' if dataset_path[-1] != '/' else dataset_path
 
         new_cfg = cfg.copy()
         new_cfg['dataset'] = dts
+        new_cfg['train_config'] = tcf
 
         output_str = json.dumps(new_cfg, indent=4, sort_keys=True)
-        file_name  = dname + '-config.json'
+        file_name  = str(Path(dname).resolve()) + '.json'
         with open(file_name, 'w') as f:
             f.write(output_str)
         print('wrote:', file_name)
@@ -141,32 +176,53 @@ def tests(df):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("metapath", help="metadata path")
-    parser.add_argument("n", type=int, help="number of splits")
-    parser.add_argument("tp", type=float, help="train data porcentage")
-    parser.add_argument("vp", type=float, help="validation data porcentage")
-    parser.add_argument("seed", type=int, help="seed to split data")
+    parser.add_argument("column", type=str, help="column to be split")
+    parser.add_argument("value", type=int, help="value to be choosen")
+    # parser.add_argument("train_size", type=float, help="train data porcentage")
+    # parser.add_argument("eval_size", type=float, help="validation data porcentage")
     parser.add_argument("template", help="directories names prefix")
     parser.add_argument("configpath", help="configuration file as template")
-    parser.add_argument("dspath", help="dataset path")
+    parser.add_argument("logpath", help="log path")
+    parser.add_argument("seed", type=int, help="seed to split data")
+    # parser.add_argument("dspath", help="dataset path")
+    
 
-    args = parser.parse_args()
-
-    n    = args.n
-    path = args.metapath
-    tp   = args.tp
-    vp   = args.vp
-    template = args.template
-    cfg_path = str(Path(args.configpath).resolve())
-    ds_path  = str(Path(args.dspath).resolve())
-    seed     = args.seed
+    args       = parser.parse_args()
+    path       = args.metapath
+    column     = args.column
+    value      = args.value
+    train_size = 0.7 # args.train_size
+    eval_size  = 0.1 # args.eval_size
+    template   = args.template
+    cfg_path   = str(Path(args.configpath).resolve())
+    ds_path    = str(Path(path).resolve())
+    log_path   = str(Path(args.logpath).resolve())
+    seed       = args.seed
 
     print("seed:", seed)
     random.seed(seed)
 
-    df         = fetch_all_data(path)
-    tests(df)
+    # Obtém todo o dataset
+    df    = fetch_all_data(path)
+    cols  = df.columns
+    # Separa em dois datasets, um onde class == 0 e outro onde class != 0
+    x, xs = split_in2_by(df, column, value)
+    # Passa 'p' dados de um conjunto para o outro
+    dfs   = shuffle_and_mix(x, xs, p=0.1)
+    # dfs = shuffle_and_mix(x, xs, p=0.2)
+    # dfs = shuffle_and_mix(x, xs, p=0.3)
+    # dfs = shuffle_and_mix(x, xs, p=0.4)
+    # dfs = shuffle_and_mix(x, xs, p=0.5)
+    # Separa cada dataset em partes de treino, validação e teste
+    splits = list(tvt_split(dfs, train_size, eval_size, seed))
+    # Escreve os metadados em disco
+    metadata_paths = write_metadata(splits, template, cols)
+    # Cria arquivo de configuração para usar os novos metadados
+    create_config(cfg_path, metadata_paths, ds_path, log_path)
+
+    # LEGADO
+    # tests(df)
     # dfs, rest  = split_in(df, args.n)
-    dfs = split_by(df, 'class', 0, 0.73)
-    splits     = list(tvt_split(dfs, tp, vp, seed))
-    metadata_paths = write_metadata(splits, template)
-    create_config(cfg_path, metadata_paths, ds_path)
+    # dfs = split_by(df, 'class', 0, 0.33)
+    # dfs = split_by(df, 'class', 0, 1)
+
