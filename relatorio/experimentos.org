@@ -1,13 +1,12 @@
-#+TODO: TODO RUNNING VERIFY | DONE REDO
+#+TODO: TODO RUNNING | VERIFY DONE
 * Sequência de testes que devem ser feitos
-** RUNNING Teste do modelo do artigo
-** TODO Teste separando uniforme
+** DONE Teste do modelo do artigo
 ** TODO Testes separando em datasets de mesmo tamanho mas com as classes desbalanceadas
-- [ ]  0%
-- [ ] 10%
-- [ ] 20%
-- [ ] 30%
-- [ ] 40%
-- [ ] 50%
+*** TODO 0%
+*** RUNNING 10%
+*** TODO 20%
+*** TODO 30%
+*** TODO 40%
+*** TODO 50%
 
 Para todos os testes realizar 5 repetições
