@@ -2,11 +2,11 @@
 * Sequência de testes que devem ser feitos
 ** DONE Teste do modelo do artigo
 ** TODO Testes separando em datasets de mesmo tamanho mas com as classes desbalanceadas
-*** TODO 0%
-*** RUNNING 10%
+*** RUNNING 0%
+*** VERIFY 10%
 *** TODO 20%
 *** TODO 30%
 *** TODO 40%
-*** TODO 50%
+*** VERIFY 50%
 
 Para todos os testes realizar 5 repetições
