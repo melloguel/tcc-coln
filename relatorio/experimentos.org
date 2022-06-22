@@ -3,10 +3,14 @@
 ** DONE Teste do modelo do artigo
 ** TODO Testes separando em datasets de mesmo tamanho mas com as classes desbalanceadas
 *** RUNNING 0%
-*** VERIFY 10%
+*** TODO 10%
 *** TODO 20%
 *** TODO 30%
 *** TODO 40%
-*** VERIFY 50%
+*** TODO 50%
 
-Para todos os testes realizar 5 repetições
+* Para todos os testes realizar 5 repetições (Estou inicialmente realizando apenas uma)
+* Quando for realizar os testes, realizar testando em dois casos:
+- Com os testes separados
+- Com o teste **global** (teste das duas partições juntos)
+
