@@ -191,8 +191,8 @@ if __name__ == '__main__':
     path       = args.metapath
     column     = args.column
     value      = args.value
-    train_size = 0.7 # args.train_size
-    eval_size  = 0.1 # args.eval_size
+    train_size = 0.8 # args.train_size
+    eval_size  = 0.8 # args.eval_size
     template   = args.template
     cfg_path   = str(Path(args.configpath).resolve())
     ds_path    = str(Path(path).resolve())
