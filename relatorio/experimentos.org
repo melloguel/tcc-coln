@@ -1,16 +1,45 @@
 #+TODO: TODO RUNNING | VERIFY DONE
 * Sequência de testes que devem ser feitos
 ** DONE Teste do modelo do artigo
-** TODO Testes separando em datasets de mesmo tamanho mas com as classes desbalanceadas
-*** RUNNING 0%
-*** TODO 10%
-*** TODO 20%
-*** TODO 30%
-*** TODO 40%
-*** TODO 50%
+** VERIFY Testes separando em datasets de mesmo tamanho mas com as classes desbalanceadas
+*** DONE 0%
+*** DONE 10%
+*** DONE 20%
+*** DONE 30%
+*** DONE 40%
+*** DONE 50%
+** DONE Escrever um programa para extrair os dados de acurácia e colocar em formato csv para mandar para a Aline.
+** DONE Analisar os dados obtidos e verificar se chegamos a conclusão que queríamos (bom desempenho local e péssimo desempenho local)
+** TODO Com os resultados desse teste, esquematizar essa parte para a monografia
 
 * Para todos os testes realizar 5 repetições (Estou inicialmente realizando apenas uma)
 * Quando for realizar os testes, realizar testando em dois casos:
 - Com os testes separados
 - Com o teste **global** (teste das duas partições juntos)
 
+#+begin_src: bash
+sqlite3 :memory: -cmd .import -csv relatorio/resultados.csv resultado -cmd .mode column
+#+end_src
+
+
+** RESULTADOS OBTIDOS
+- Teste com o conjunto de dados local:
+test    AVG(accuracy)
+------  -------------
+div-0   1.0
+div-10  0.9475
+div-20  0.9275
+div-30  0.9075
+div-40  0.845
+div-50  0.87
+
+
+- Teste com o conjunto de dados global:
+test    AVG(accuracy)
+------  -------------
+div-0   0.5
+div-10  0.5775
+div-20  0.72
+div-30  0.81
+div-40  0.735
+div-50  0.8775
