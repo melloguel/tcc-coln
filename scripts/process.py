@@ -1,10 +1,12 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 import argparse
 import re
 from pathlib import Path
 from os import path
 from statistics import NormalDist
+
+from myutils.generic_utils import pre_process_test_result
 
 def conf_interval(data, confidence=0.95):
     """
@@ -16,17 +18,6 @@ def conf_interval(data, confidence=0.95):
     z = NormalDist().inv_cdf((1 + confidence) / 2.)
     h = dist.stdev * z / ((len(data) - 1) ** .5)
     return dist.mean, h
-
-def pre_process(file_path, parse):
-    with open(file_path, 'r') as fle:
-        contents = fle.readlines()
-
-    data = map(lambda s: re.search(r"Acurracy:\s+(.*)$", s), contents) if parse else contents
-    data = filter(lambda i: i is not None, data)
-    data = map(lambda m: float(m.groups()[0]), data) if parse else map(float, data)
-    data = list(data)
-
-    return data
 
 if __name__ == '__main__':
 
@@ -40,6 +31,6 @@ if __name__ == '__main__':
     if args.files:
         print("test,mean,width")
         for fle in args.files:
-            values = pre_process(Path(fle).absolute(), parse=args.no_preprocess)
+            values = pre_process_test_result(Path(fle).absolute(), parse=args.no_preprocess)
             mean, width  = conf_interval(values)
             print(f"{fle},{mean:.3},{width:.3}")
