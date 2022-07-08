@@ -91,32 +91,45 @@ def sum_scaled_weights(weights, conv=1):
     avggrad = created_model_inn(weights, porcs, 2., conv)
     return avggrad
 
-
 class SimpleMLP(nn.Module):
     def __init__(self):
         # super(SimpleMLP, self).__init__()
         super().__init__()
+        self.l1    = nn.Linear(in_features=30, out_features=16)
         self.d1    = nn.ReLU()
-        self.drop1 = nn.dropout(0.25)
+        self.drop1 = nn.Dropout(0.25)
+        self.l2    = nn.Linear(in_features=16, out_features=16)
         self.d2    = nn.RelU()
-        self.drop2 = nn.dropout(0.25)
-        self.d3    = nn.sigmoid()
+        self.drop2 = nn.Dropout(0.25)
+        self.d3    = nn.Sigmoid()
 
     def forward(self, x):
+        x = self.l1(x)
         x = self.d1(x)
         x = self.drop1(x)
+        x = self.l2(x)
         x = self.d2(x)
         x = self.drop2(x)
         x = self.d3(x)
         return x
 
     def get_weights(self):
-        '''TODO: Return dictionary with current weights.'''
-        print("get_weights not implemented!")
+        '''Return a dictionary with current weights.'''
+        weights = {}
+        for i, layer in enumerate(self.modules()):
+            if not isinstance(layer, nn.Sequential):
+                if getattr(layer, 'weight', None) is not None:
+                    weights[i] = layer.weight
+
+        return weights
 
     def set_weights(self, weights):
-        '''TODO: Update current weights with given weights.'''
-        print("set_weights not implemented!")
+        '''Update current weights with given weights.'''
+        current_weights = self.get_weights()
+
+        with torch.no_grad():
+            for k, weight in current_weights.items():
+                weight.copy_(weights[k])
 
 def train(model, trainloader, debug=False):
     '''
