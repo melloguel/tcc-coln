@@ -78,53 +78,9 @@ def inn_calculate_weights(weight_1, weight_2, p_1, p_2, euler, conv):
     return weighted_sum(le_threshold, n4_sum + n4_1,
                         gt_threshold, n4_sum)
 
-def INN_CalculateBIAS(a, b, porc1, porc2, euler, conv):
-    #calculate Euclides Distance
-    N1 =a.reshape(-1,1)
-    N2 =b.reshape(-1,1)
-
-
-    dim, soma = len(N1), 0
-    for i in range(dim):
-        soma += (math.pow(N1[i] - N2[i], 2))
-
-    dist_euclidiana_total = math.sqrt(soma)
-
-
-    threshold = (dist_euclidiana_total / dim)
-
-    conta=0;
-    contb=0;
-
-    ii = len(a)
-    inv = a
-    if (ii==0):
-        ii = 1
-    for i in range(ii):
-
-        n1 = a[i] * porc1
-        n2 = b[i] * porc2
-
-        dist = math.pow(n1 - n2, 2)
-
-        dist_euclidiana = math.sqrt(dist)
-        n4_1 = dist_euclidiana
-
-        n4_sum=(((n1 * (e ** (conv*porc1))) +
-                 (n2 * (e ** (conv*porc2)))
-                ))
-
-        if dist_euclidiana<=threshold:
-            n4 = n4_sum + n4_1
-            conta+= 1
-        else:
-            n4 = n4_sum
-            contb += 1
-
-        inv[i] = n4
-
-    return inv
-
+def inn_calculate_bias(a, b, p_1, p_2, conv):
+    # TODO: This function looks like it is just the else case of inn_calculate_weights
+    inn_calculate_weights(a, b, p_1, p_2, 2, conv)
 
 def sum_scaled_weights(weights, conv=1):
     '''
