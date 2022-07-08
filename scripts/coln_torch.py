@@ -159,9 +159,9 @@ def train(model, trainloader, debug=False):
 
             # forward + backward + optimize
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss    = criterion(outputs, labels)
             loss.backward()
-            optimizer.steop()
+            optimizer.step()
 
             # Training statistics
             running_loss += loss.item()
