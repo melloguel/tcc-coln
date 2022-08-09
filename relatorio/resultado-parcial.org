@@ -1,0 +1,137 @@
+#+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
+
+#+Title: Testes e Resultados (Até dia 9/8/22)
+#+Author: Miguel de Mello Carpi
+
+* Modelo do Artigo
+Primeiro é realizado um teste com melhor configuração do artigo do Spira. No
+treinamento é utiliza-se inserção de ruído e após 22000 iterações,
+aproximadamente 350 épocas, o treinamento é interrompido e o modelo é
+testado. Na Tabela [[Tabela 1]] é possível ver os resultados obtidos com os testes
+utilizando inserção de ruído, w-noise, e sem inserção de rúido, wo-noise.
+
+#+NAME: Tabela 1
+| test         |  mean |  width |
+| w-noise      | 0.863 | 0.0582 |
+| wo-noise     | 0.883 | 0.0604 |
+
+Observando e comparando os resultados da Tabela [[Tabela 1]] com os obtidos no
+artigo, pode-se concluir que eles estão próximos. Isso indica que essa
+configuração traz os melhores resultados e portanto é a configuração que deve
+ser utilizada para treinar os modelos com o aprendizado combinado.
+
+* Testes Preparatórios para CoLn
+
+Para aplicar o aprendizado combinado é necessário ter uma situação onde não
+temos acesso ao conjunto de dados inteiro. Como neste caso temos o conjuto de
+dados inteiro, simula-se a situação do aprendizado combinado por meio da divisão
+do conjunto de dados em dois. Para deixar o resultado mais interessante, cinco
+divisões são feitas variando a quantidade de rótulos em cada conjunto de dados,
+mas mantendo a mesma quantidade de dados em cada parte.
+
+A primeira divisão, div-0, é o caso mais extremo, onde uma metade possui somente
+pacientes com diagnóstico positivo e a outra metade somente pacientes com
+diagnóstico negativo. A segunda divisão, div-10, possui em uma metade 10% dos
+pacientes com diagnóstico positivo e 90% com diagnóstico negativo e a outra
+metade com 90% diagnóstico positivo e 10% diagnóstico positivo. As demais
+divisões div-20, div-30, div-40 e div-50 seguem a mesma lógica, no caso da
+div-50 temos a mesma situação de treinamento com o conjunto de dados completo,
+porém com menos dados.
+
+Outro fator que temos que testar para garantir que faz sentido aplicar o
+aprendizado combinado é que os resultados obtidos com o treinamento nos
+conjuntos de dados menores é ótimo localmente, porém, ao testar no conjunto
+inteiro o modelo tem um desempenho pior. Esse é o comportamento esperado, pois
+estamos reduzindo a quantidade de informação que o modelo recebe.
+
+O resultado do testes dos modelos treinados em cada divisão do conjunto de dados
+no conjunto de dados local pode ser visto na Tabela [[Tabela 2]]. Os resultados parecem
+muito satisfatórios.
+
+#+NAME: Tabela 2
+| test   | accuracy |
+| div-0  |      1.0 |
+| div-10 |   0.9475 |
+| div-20 |   0.9275 |
+| div-30 |   0.9075 |
+| div-40 |    0.845 |
+| div-50 |     0.87 |
+
+Na Tabela [[Tabela 3]] encontra-se o desempenho dos modelos no conjunto de testes global.
+
+#+NAME: Tabela 3
+| test   | accuracy |
+| div-0  |      0.5 |
+| div-10 |   0.5775 |
+| div-20 |     0.72 |
+| div-30 |     0.81 |
+| div-40 |    0.735 |
+| div-50 |   0.8775 |
+
+
+Com a Tabela [[Tabela 2]] e Tabela [[Tabela 3]] pode-se concluir que as divisões div-0, div-10,
+div-20, div-30, div-40, feitas no conjunto de dados inteiro dão situações
+propícias para aplicar o aprendizado combinado. A div-50 não é tão interessante,
+pois a acurácia obtida nela é bem próxima a da obtida treinando o modelo no
+conjunto de dados completo, porém pode-se aplicar o aprendizado combinado nessa
+divisão com o intuito de obter uma acurácia superior.
+
+* Experimentos realizados com o CoLn
+Antes de testar o algoritmo de aprendizado combinado com o modelo Spira, testou-se
+a implementação do CoLn para os seguintes casos: prever câncer de mama, e classificar
+dígitos escritos à mão (MNIST). O intuito desses testes é checar se a implementação
+do algoritmo está correta.
+
+Como no caso do Spira, realiza-se uma divisão manual dos dados para simular o
+cenário no qual o aprendizado combinado pode ser aplicado. Para o conjunto de
+dados referente ao câncer de mama, separa-se o conjunto de dados original em
+dois outros onde o primeiro só possui casos positivos e o segundo somente casos
+negativos. A divisão do conjunto de dados do MNIST é mais complicada, porque
+há mais de duas classes para classificar, contudo isso permite testar o algoritmo
+com mais de dois modelos.
+
+** Modelo para prever câncer de mama
+Na Figura [[Figura 1]], é possível constatar que o modelo obtido com o aprendizado combinado
+começa com uma acurácia/exatidão baixa, porém ela aumenta rapidamente.
+
+#+Name: Figura 1
+[[./imgs/dados-cancer.png]]
+
+** Modelo para prever dígitos escritos à mão
+Para este caso são realizados três testes. No primeiro teste divide-se o
+conjunto de dados em dois de forma que um contenha os dígitos 0, 1, 2, 3, 4
+(0-4) e que o outro contenha os dígitos 5, 6, 7, 8, 9 (0-5).  Como a quantidade
+de dados para cada classe (cada dígito no caso) é próxima, o tamanho dos dois
+conjuntos de dados ficou próximo. No segundo teste, remove-se completamente os
+dados referentes ao dígito 9 e divide-se o conjuto de dados resultante em três
+(0-2, 3-5, 6-8). No terceiro e último teste os dados referentes aos dígitos 8 e
+9 são removidos e o conjunto de dados restante é dívidido em quatro (0-1, 2-3,
+4-5, 6-7).  Optou-se pela remoção de dados (sem alterar o número de classes do
+classificador) para deixar cada modelo com um mesmo número de classes para
+classificar (5, 3 e 2 clases respectivamente).
+
+#+Caption: Resultados utilizando dois classificadores
+#+Name: Figura 2
+[[./imgs/mnist-2.png]]
+
+#+Caption: Resultados utilizado três classificadores
+#+Name: Figura 3
+[[./imgs/mnist-3.png]]
+
+#+Caption: Resultados utilizado quatro classificadores
+#+Name: Figura 4
+[[./imgs/mnist-4.png]]
+
+Com os testes realizados é possível destacar três características. Aumentar o
+número de modelos faz com que sejam necessários mais passos para que o modelo
+combinado atinja um resultado satisfatório e também fez com que o desempenho
+máximo obtido caísse, pois com dois modelos a melhor acurácia/exatidão foi x, já
+com três foi y e com quatro foi z. Por fim, o modelo combinado pode ficar pior
+em um caso local.
+
+** Conclusão
+Por meio da análise dos resultados e sua comparação com a base teórica, pode-se
+concluir que a implementação do algoritmo CoLn está correta para dois, três e
+quatro modelos.  Para os dados do projeto Spira, será utilizado dois modelos, um
+para cada divisão, e espera-se obter resutaldos similares aos resultados obtidos
+até o momento.
