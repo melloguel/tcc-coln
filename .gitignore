@@ -1,2 +1,9 @@
 .ipynb_checkpoints/*
 __pycache__
+entrega.zip
+.erros
+.gnuplot.p
+*.pdf
+*.tex
+*.dat
+*/data/MNIST/*
