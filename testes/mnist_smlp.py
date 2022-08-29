@@ -22,7 +22,7 @@ class SimpleMLP(nn.Module):
         return a
 
 
-def mk_mnist_smlp(traindt, testdt):
+def mk_mnist_smlp(traindt, validdt, testdt):
     epochs       = 15
     criterion    = nn.CrossEntropyLoss()
     optim_params = { 'lr' : 0.01, 'momentum' : 0.9 }
@@ -34,6 +34,7 @@ def mk_mnist_smlp(traindt, testdt):
                        optimizer,
                        optim_params,
                        traindt,
+                       validdt,
                        testdt,
                        epochs=epochs,
                        gpu=True)

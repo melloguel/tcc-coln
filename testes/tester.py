@@ -9,6 +9,7 @@ import sys
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.data import random_split
 from torchvision.datasets import MNIST, CIFAR10
 from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset, DataLoader
@@ -26,32 +27,38 @@ def fetch_dataset(dataset):
                       train=True,
                       download=True,
                       transform = ToTensor())
-    testdt   = dataset(root='./data',
-                       train=False,
-                       download=True,
-                       transform = ToTensor())
-    return traindt, testdt
+    validdt = dataset(root='./data',
+                      train=False,
+                      download=True,
+                      transform = ToTensor())
+
+    total = len(traindt)
+    traindt, testdt = random_split(traindt, lengths=(total - total//6, total//6))
+    return traindt, validdt, testdt
 
 def mkpred(i, s):
     def pred(data):
         return i <= data[1] < i+s
     return pred
 
-def mkdl(dt):
-    return DataLoader(dt, batch_size=128)
+def mkdl(dt, bs=64, train=False):
+    return DataLoader(dt, batch_size=bs, shuffle=train)
 
-def mkdls(traindt, testdt, skip):
+def mkdls(traindt, validdt, testdt, skip):
     traindts = []
+    validdts = []
     testdts  = []
     r = []
     for i in range(0, 10, skip):
         pred = mkpred(i, skip)
         tr = list(filter(pred, traindt))
+        tv = list(filter(pred, validdt))
         te = list(filter(pred, testdt))
         r.append(len(tr)/len(traindt))
-        traindts.append(mkdl(tr))
+        traindts.append(mkdl(tr, train=True))
+        validdts.append(mkdl(tv))
         testdts.append(mkdl(te))
-    return traindts, testdts, r
+    return traindts, validdts, testdts, r
 
 def mkhooks(storage, test_gl):
     def bhook(models):
@@ -69,23 +76,25 @@ def wrstorage(storage, testname):
         f.write(txt)
 
 def sanity_test(mkmodel, dataset, testname):
-    traindt, testdt = fetch_dataset(dataset)
-    model = mkmodel(mkdl(traindt), mkdl(testdt))
-    print('test:', testname)
+    traindt, validdt, testdt = fetch_dataset(dataset)
+    print('size train:', len(traindt))
+    print('size valid:', len(validdt))
+    print('size test:', len(testdt))
+    model = mkmodel(mkdl(traindt, bs=256, train=True), mkdl(validdt, bs=256), mkdl(testdt, bs=256))
+    print('model:', testname)
     print('parameters:', sum(map(prod, map(lambda x: x.shape, model.get_layers()))))
-    model.train()
+    model.train(debug=True)
     print(model.test())
 
 def test(model, dataset, testname):
-    traindt, testdt = fetch_dataset(dataset)
+    traindt, validdt, testdt = fetch_dataset(dataset)
 
-    cases = [2, 5, 10]
-    steps = { 2 : 5, 5 : 30, 10 : 80 }
+    cases = { 2 : 5, 5 : 30, 10 : 80 }
 
-    for n in cases:
-        traindts, testdts, r  = mkdls(traindt, testdt, 10 // n)
+    for n, steps in cases.items():
+        traindts, validdts, testdts, r  = mkdls(traindt, validdt, testdt, 10 // n)
 
-        models = [model(train, test) for train, test in zip(traindts, testdts)]
+        models = [model(train, valid, test) for train, valid, test in zip(traindts, validdts, testdts)]
 
         storage = [' '.join(f'm{i+1}' for i in range(len(models))) + ' gl']
         bhook, ahook = mkhooks(storage, mkdl(testdt))
@@ -93,12 +102,12 @@ def test(model, dataset, testname):
         combine(models,
                 r,
                 0.01,
-                steps=steps[n],
+                steps=steps,
                 before_combine_hook=bhook,
                 after_combine_hook=ahook)
 
         wrstorage(storage, f'{testname}-{n}.dat')
-        print('\t'+testname, 'done!')
+        print(f'\t{testname}-{n} done!')
 
 def main():
     parser = argparse.ArgumentParser(description='Run CoLn tests.')
