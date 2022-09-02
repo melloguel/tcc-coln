@@ -92,26 +92,16 @@ class ModelConfig(AbstractModel):
     def test(self, testloader=None):
         '''Test model using function criterion.'''
 
-        if self.gpu:
-            self.model = self.model.cuda()
-
         self.model.train(False)
         testloader = testloader or self.testdt
         loss = 0.0
         acc  = 0.0
         for features, target in testloader:
-            if self.gpu:
-                features = features.cuda()
-                target = target.cuda()
-
                 output = self.model(features)
                 loss  += self.criter(output, target).item()
 
                 pred   = output.data.max(1, keepdim=True)[1]
                 acc  += pred.eq(target.data.view_as(pred)).sum()
 
-        if self.gpu:
-            self.model = self.model.to('cpu')
-
         size = len(testloader.dataset)
-        return { 'loss': loss/size, 'acc': acc.item()/size}
+        return { 'loss': loss/size, 'acc': acc/size}
