@@ -35,21 +35,22 @@ class LargeMLP(nn.Module):
         return a
 
 
-def mk_mnist_lmlp(traindt, validdt, testdt, gpu):
+def mk_mnist_lmlp(traindt, validdt, testdt, device):
     epochs       = 20
     criterion    = nn.NLLLoss()
     optim_params = { 'lr' : 0.01, 'momentum': 0.9}
     optimizer    = optim.SGD
 
-    return ModelConfig(LargeMLP(),
-                       criterion,
-                       optimizer,
-                       optim_params,
-                       traindt,
-                       validdt,
-                       testdt,
-                       epochs=epochs,
-                       gpu=gpu)
+    return ModelConfig(
+            model=LargeMLP(),
+            criterion=criterion,
+            optimizer=optimizer,
+            optimizer_params=optim_params,
+            traindt=traindt,
+            validdt=validdt,
+            testdt=testdt,
+            epochs=epochs,
+            device=device)
 
 if __name__ == '__main__':
     model = LargeMLP()
