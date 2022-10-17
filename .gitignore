@@ -7,3 +7,9 @@ entrega.zip
 *.tex
 *.dat
 */data/MNIST/*
+*.old
+*.vim
+*todo*
+testes/data/*
+data/*
+tags*
