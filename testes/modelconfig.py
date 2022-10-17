@@ -6,16 +6,21 @@ import torch
 from coln import AbstractModel
 
 class ModelConfig(AbstractModel):
-    def __init__(self, model, criterion, optimizer, optimizer_params,
-                 traindt, validdt, testdt, epochs, gpu=None):
-        self.model   = model
-        self.criter  = criterion
-        self.optim   = optimizer(model.parameters(), **optimizer_params)
-        self.traindt = traindt
-        self.validdt = validdt
-        self.testdt  = testdt
-        self.epochs  = epochs
-        self.gpu     = gpu
+    #def __init__(self, model, criterion, optimizer, optimizer_params, scheduler, scheduler_params,
+    #             traindt, validdt, testdt, epochs, device):
+    def __init__(self, **args):
+
+        self.device      = args.get('device', 'cpu')
+        self.model       = args['model'].to(self.device)
+        self.criter      = args['criterion']
+        self.optim       = args['optimizer'](self.model.parameters(), **args['optimizer_params'])
+        self.traindt     = args['traindt']
+        self.validdt     = args['validdt']
+        self.testdt      = args['testdt']
+        self.epochs      = args['epochs']
+        scheduler_params = args.get('scheduler_params', None)
+        self.scheduler   = args.get('scheduler', None)
+        self.scheduler   = self.scheduler(self.optim, **scheduler_params) if self.scheduler else None
 
     def get_layers(self):
         self.model.train(mode=False)
@@ -35,9 +40,8 @@ class ModelConfig(AbstractModel):
 
         for i, data in enumerate(self.traindt):
             inputs, labels = data
-            if self.gpu:
-                inputs = inputs.cuda()
-                labels = labels.cuda()
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
 
             self.optim.zero_grad()
 
@@ -59,8 +63,8 @@ class ModelConfig(AbstractModel):
 
     def train(self, debug=False):
 
-        if self.gpu:
-            self.model = self.model.cuda()
+        loss = [('train', 'validation')]
+
 
         self.model.train()
 
@@ -71,23 +75,30 @@ class ModelConfig(AbstractModel):
             self.model.train(True)
             avg_loss = self.one_epoch(debug)
 
+            if self.scheduler:
+                self.scheduler.step()
+
             self.model.train(False)
             running_vloss = 0.0
             for vinputs, vlabels in self.validdt:
-                if self.gpu:
-                    vinputs = vinputs.cuda()
-                    vlabels = vlabels.cuda()
+                vinputs = vinputs.to(self.device)
+                vlabels = vlabels.to(self.device)
 
                 voutputs = self.model(vinputs)
                 vloss = self.criter(voutputs, vlabels)
                 running_vloss += vloss
 
             avg_vloss = running_vloss / (len(self.validdt))
+
             if debug:
                 print(f'LOSS train {avg_loss} valid {avg_vloss}')
+                loss.append((avg_loss, avg_vloss))
 
-        if self.gpu:
-            self.model = self.model.to('cpu')
+        if isinstance(debug, str):
+            with open(debug, 'w') as f:
+                f.write(' '.join(loss[0]) + '\n')
+                f.write('\n'.join(map(lambda x: f'{x[0]:4.3f} {x[1]:4.3f}', loss[1:])))
+                f.write('\n')
 
     def test(self, testloader=None):
         '''Test model using function criterion.'''
@@ -97,6 +108,7 @@ class ModelConfig(AbstractModel):
         loss = 0.0
         acc  = 0.0
         for features, target in testloader:
+                features, target = features.to(self.device), target.to(self.device)
                 output = self.model(features)
                 loss  += self.criter(output, target).item()
 
