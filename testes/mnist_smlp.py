@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch import optim
 from torchinfo import summary
 
-from coln import AbstractModel
 from modelconfig import ModelConfig
 
 class SimpleMLP(nn.Module):

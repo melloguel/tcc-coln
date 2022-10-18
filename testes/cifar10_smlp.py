@@ -4,7 +4,6 @@ from torch.nn.functional import relu, softmax
 from torch import optim
 from torchinfo import summary
 
-from coln import AbstractModel
 from modelconfig import ModelConfig
 
 class SimpleMLP(nn.Module):
