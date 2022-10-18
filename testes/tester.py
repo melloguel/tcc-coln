@@ -21,7 +21,8 @@ from mnist_mmlp import mk_mnist_mmlp
 from cifar10_smlp import mk_cifar10_smlp
 from cifar10_conv import mk_cifar10_conv
 
-from coln import combine
+import coln
+import mean
 
 def fetch_dataset(dataset, transforms):
     transforms = Compose(transforms)
@@ -159,19 +160,20 @@ def sanity_test(**kwargs):
 def test(**kwargs):
 
     model      = kwargs['model']
-    splitter   = kwargs['splitter']
+    split      = kwargs['split']
     dataset    = kwargs['dataset']
     testname   = kwargs['testname']
     batchsize  = kwargs['batchsize']
     device     = kwargs['device']
     transforms = kwargs['transforms']
+    combine    = kwargs['combine']
 
     traindt, validdt, testdt = fetch_dataset(dataset, transforms)
 
     cases = {2: 5, 5: 30, 10: 60}
 
     for n, steps in cases.items():
-        traindts, validdts, testdts, r = splitter(traindt, validdt, testdt, n, batchsize)
+        traindts, validdts, testdts, r = split(traindt, validdt, testdt, n, batchsize)
 
         models = [model(train, valid, test, device) for train, valid,
                   test in zip(traindts, validdts, testdts)]
@@ -179,9 +181,9 @@ def test(**kwargs):
         storage = [' '.join(f'm{i+1}' for i in range(len(models))) + ' gl']
         bhook, ahook = mkhooks(storage, mkdl(testdt, bs=batchsize))
 
-        combine(models,
-                r,
-                0.01,
+        combine(models=models,
+                distribution=r,
+                conv=0.01,
                 steps=steps,
                 before_combine_hook=bhook,
                 after_combine_hook=ahook)
@@ -197,6 +199,8 @@ def main():
                         help='model used in tests.')
     parser.add_argument('--splitter', type=str, required=False, default="chaotic",
                         help='how to split dataset for coln training. Can be "uniform" or "chaotic"')
+    parser.add_argument('--combine', type=str, required=False, default='coln',
+                        help='how to combine the models. Default: coln')
     parser.add_argument('--check',
                         action='store_true',
                         help='''Test model with full dataset.\
@@ -206,36 +210,41 @@ def main():
     parser.add_argument('--no-gpu', action='store_false', help='Use CPU to train the model.')
 
     datasets = {
-            'MNIST'  : MNIST,
-            'CIFAR10': CIFAR10
+        'MNIST'  : MNIST,
+        'CIFAR10': CIFAR10
     }
 
     transforms = {
-            'MNIST'   : [ToTensor()],
-            'CIFAR10' : [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        'MNIST'   : [ToTensor()],
+        'CIFAR10' : [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     }
 
     mnist_networks = {
-            'lmlp': mk_mnist_lmlp,
-            'smlp': mk_mnist_smlp,
-            'conv': mk_mnist_conv,
-            'mmlp': mk_mnist_mmlp,
+        'lmlp': mk_mnist_lmlp,
+        'smlp': mk_mnist_smlp,
+        'conv': mk_mnist_conv,
+        'mmlp': mk_mnist_mmlp,
     }
 
     cifar10_networks = {
-            'smlp' : mk_cifar10_smlp,
-            #'lmlp' : mk_cifar10_lmlp,
-            'conv' : mk_cifar10_conv
+        'smlp' : mk_cifar10_smlp,
+        #'lmlp' : mk_cifar10_lmlp,
+        'conv' : mk_cifar10_conv
     }
 
     networks = {
-            'MNIST': mnist_networks,
-            'CIFAR10' : cifar10_networks
+        'MNIST': mnist_networks,
+        'CIFAR10' : cifar10_networks
     }
 
     splitters = {
-            'chaotic' : mkdls_chaotic,
-            'uniform' : mkdls_uniform,
+        'chaotic' : mkdls_chaotic,
+        'uniform' : mkdls_uniform,
+    }
+
+    combiners = {
+        'coln' : coln.combine,
+        'mean' : mean.combine,
     }
 
     args = parser.parse_args()
@@ -255,18 +264,29 @@ def main():
         sys.exit(21)
 
     try:
-        splitter = splitters[args.splitter.lower()]
+        splitter = args.splitter.lower()
+        split    = splitters[splitter]
     except KeyError:
-        print(f'split "{split}" not found. Available splits are:', ', '.join(splits.keys()))
+        print(f'split "{splitter}" not found. Available splits are:', ', '.join(splits.keys()))
 
+    try:
+        combiner = args.combine.lower()
+        combine = combiners[combiner]
+    except KeyError:
+        print(f'combine "{combiner}" not found. Available combine methods are:', ', '.join(combiners.keys()))
+
+    testname = dataset_name.lower()+'-'+model_name.lower()
+    if not args.check:
+        testname += ('-'+args.splitter.lower()+'-'+args.combine.lower())
     test_args = {
-            'model'      : model,
-            'dataset'    : dataset,
-            'testname'   : dataset_name.lower()+'-'+model_name.lower()+('-'+args.splitter.lower() if not args.check else ''),
-            'batchsize'  : args.batchsize,
-            'device'     : "cuda" if not args.no_gpu else "cpu",
-            'transforms' : transforms[dataset_name],
-            'splitter'   : splitter,
+        'model'      : model,
+        'dataset'    : dataset,
+        'testname'   : testname,
+        'batchsize'  : args.batchsize,
+        'device'     : "cuda" if not args.no_gpu else "cpu",
+        'transforms' : transforms[dataset_name],
+        'split'      : split,
+        'combine'    : combine,
     }
 
     if args.check:
@@ -275,7 +295,15 @@ def main():
                 print(f'{item:<11}{test_args[item]:>15}')
         sanity_test(**test_args)
     else:
-        print('testing coln')
+        items = [('model', model_name),
+                 ('dataset', dataset_name),
+                 ('device', test_args['device']),
+                 ('batch_size', test_args['batchsize']),
+                 ('split', splitter),
+                 ('combine', combiner)]
+        for name, value in items:
+            print(f"{name:<20} {value:<20}")
+        
         test(**test_args)
 
 if __name__ == '__main__':
