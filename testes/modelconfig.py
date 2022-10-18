@@ -2,8 +2,9 @@
 '''
 Setup to train classifiers.
 '''
+
 import torch
-from coln import AbstractModel
+from model import AbstractModel
 
 class ModelConfig(AbstractModel):
     #def __init__(self, model, criterion, optimizer, optimizer_params, scheduler, scheduler_params,
@@ -53,7 +54,7 @@ class ModelConfig(AbstractModel):
             self.optim.step()
 
             running_loss += loss.item()
-            if i % (mark//4) == (mark//4 - 1):
+            if (mark//4) and i % (mark//4) == (mark//4 - 1):
                 last_loss = running_loss / 1000
                 if debug:
                     print(f'    batch {i+1:3d} loss: {last_loss}')

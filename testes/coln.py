@@ -6,35 +6,9 @@ To use this lib, the user must create a concrete implementation of the AbstracMo
 Then, create i models, assinging a relevance r_i, 0 < r_i < 1 with sum(r_i) == 1.
 Finally, call combine() passing the models and relevance list.
 '''
-from abc import ABC, abstractmethod
+
 from math import e, prod
 from random import choice
-
-### Auxiliar Class
-class AbstractModel(ABC):
-    '''
-    Abstract class representing a Neural Network Model.
-    '''
-    @abstractmethod
-    def get_layers(self):
-        '''
-        Returns a list where each item corresponds to the weights (parameters) of a layer.
-        The order of the elements should be the same for every call.
-        For example, this function could call model.parameters() in torch or
-        model.get_weights() in tensorflow.
-        '''
-
-    @abstractmethod
-    def set_layers(self, new_layers):
-        '''
-        Replace current model weights with the new_weights layer by layer.
-        '''
-
-    @abstractmethod
-    def train(self):
-        '''
-        Train the model.
-        '''
 
 ### MAIN FUNCTIONS
 def inn_create_model(layers, porcs, conv):
@@ -97,13 +71,7 @@ def inn_combine_layers(layers, porcs, conv):
 
     return newlayer
 
-def combine(models,
-            distribution,
-            conv,
-            steps=5,
-            before_combine_hook=None,
-            after_combine_hook=None
-            ):
+def combine(**args):
     '''
     Run CoLn [steps] times.
 
@@ -122,6 +90,13 @@ def combine(models,
     3) Assign the averaged weight to the weights of each model
     '''
 
+    models              = args['models']
+    distribution        = args['distribution']
+    conv                = args['conv']
+    steps               = args['steps']
+    before_combine_hook = args.get('before_combine_hook', None)
+    after_combine_hook  = args.get('after_combine_hook', None)
+    
     # Check if parameters are ok
     assert len(models) > 1, "There must be at least 2 models"
     assert len(models) == len(distribution), "Each model must have a related distribution"
