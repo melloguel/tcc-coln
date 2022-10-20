@@ -207,7 +207,7 @@ def main():
                         May be used to verfiy the neural network performance.''')
     parser.add_argument('--batchsize', dest='batchsize', default=128, type=int,
                         help="Batch size used during training, validation and testing.")
-    parser.add_argument('--no-gpu', action='store_false', help='Use CPU to train the model.')
+    parser.add_argument('--no-gpu', action='store_true', help='Use CPU to train the model.')
 
     datasets = {
         'MNIST'  : MNIST,
@@ -268,12 +268,14 @@ def main():
         split    = splitters[splitter]
     except KeyError:
         print(f'split "{splitter}" not found. Available splits are:', ', '.join(splits.keys()))
+        sys.exit(22)
 
     try:
         combiner = args.combine.lower()
         combine = combiners[combiner]
     except KeyError:
         print(f'combine "{combiner}" not found. Available combine methods are:', ', '.join(combiners.keys()))
+        sys.exit(23)
 
     testname = dataset_name.lower()+'-'+model_name.lower()
     if not args.check:
