@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse
+import csv
 from math import prod
 from itertools import groupby
 import sys
@@ -155,7 +156,14 @@ def sanity_test(**kwargs):
                     device)
     print('parameters', sum(map(prod, map(lambda x: x.shape, model.get_layers()))))
     model.train(debug=testname+'.dat')
-    print('\n'.join(map(lambda x: f'{x[0]:<10}{x[1]:<10}', model.test().items())))
+    result = model.test()
+    for key, value in result.items():
+        result[key] = f'{value:3.3f}'
+    with open(testname+'-test.dat', 'w') as f:
+        writer = csv.DictWriter(f, fieldnames=result.keys(), delimiter=' ')
+        writer.writeheader()
+        writer.writerow(result)
+
 
 def test(**kwargs):
 
@@ -305,7 +313,7 @@ def main():
                  ('combine', combiner)]
         for name, value in items:
             print(f"{name:<20} {value:<20}")
-        
+
         test(**test_args)
 
 if __name__ == '__main__':

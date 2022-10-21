@@ -64,7 +64,7 @@ class ModelConfig(AbstractModel):
 
     def train(self, debug=False):
 
-        loss = [('train', 'validation')]
+        loss = [('epochs', 'train', 'validation')]
 
 
         self.model.train()
@@ -93,12 +93,12 @@ class ModelConfig(AbstractModel):
 
             if debug:
                 print(f'LOSS train {avg_loss} valid {avg_vloss}')
-                loss.append((avg_loss, avg_vloss))
+                loss.append((epoch, avg_loss, avg_vloss))
 
         if isinstance(debug, str):
             with open(debug, 'w') as f:
                 f.write(' '.join(loss[0]) + '\n')
-                f.write('\n'.join(map(lambda x: f'{x[0]:4.3f} {x[1]:4.3f}', loss[1:])))
+                f.write('\n'.join(map(lambda x: f'{x[0]} {x[1]:4.3f} {x[2]:4.3f}', loss[1:])))
                 f.write('\n')
 
     def test(self, testloader=None):
