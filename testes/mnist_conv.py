@@ -36,15 +36,19 @@ class MNISTConv(nn.Module):
 
 def mk_mnist_conv(traindt, validdt, testdt, device):
     epochs       = 14
-    criterion = nn.NLLLoss(reduction='sum')
-    optim_params = { 'lr' : 1.0}
+    criterion    = nn.NLLLoss(reduction='sum')
+    optim_params = { 'lr' : 1.0 }
     optimizer    = optim.Adadelta
+    scheduler    = optim.lr_scheduler.StepLR
+    sched_params = { 'step_size' : 1, 'gamma' : 0.7 }
 
     return ModelConfig(
             model=MNISTConv(),
             criterion=criterion,
             optimizer=optimizer,
             optimizer_params=optim_params,
+            scheduler=scheduler,
+            scheduler_params=sched_params,
             traindt=traindt,
             validdt=validdt,
             testdt=testdt,

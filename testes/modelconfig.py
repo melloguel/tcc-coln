@@ -2,26 +2,23 @@
 '''
 Setup to train classifiers.
 '''
-
 import torch
 from model import AbstractModel
 
 class ModelConfig(AbstractModel):
-    #def __init__(self, model, criterion, optimizer, optimizer_params, scheduler, scheduler_params,
-    #             traindt, validdt, testdt, epochs, device):
     def __init__(self, **args):
 
         self.device      = args.get('device', 'cpu')
         self.model       = args['model'].to(self.device)
         self.criter      = args['criterion']
-        self.optim       = args['optimizer'](self.model.parameters(), **args['optimizer_params'])
+        self.optimizer   = args['optimizer'](self.model.parameters(), **args['optimizer_params'])
         self.traindt     = args['traindt']
         self.validdt     = args['validdt']
         self.testdt      = args['testdt']
         self.epochs      = args['epochs']
-        scheduler_params = args.get('scheduler_params', None)
-        self.scheduler   = args.get('scheduler', None)
-        self.scheduler   = self.scheduler(self.optim, **scheduler_params) if self.scheduler else None
+        scheduler_params = args['scheduler_params']
+        self.scheduler   = args['scheduler']
+        self.scheduler   = self.scheduler(self.optimizer, **scheduler_params)
 
     def get_layers(self):
         self.model.train(mode=False)
@@ -33,88 +30,72 @@ class ModelConfig(AbstractModel):
             for old, new in zip(old_layers, new_layers):
                 old.copy_(new)
 
-    def one_epoch(self, debug=False):
-        running_loss = 0.
-        last_loss    = 0.
-
-        mark = len(self.traindt)
-
-        for i, data in enumerate(self.traindt):
-            inputs, labels = data
-            inputs = inputs.to(self.device)
-            labels = labels.to(self.device)
-
-            self.optim.zero_grad()
-
-            outputs = self.model(inputs)
-
-            loss = self.criter(outputs, labels)
-            loss.backward()
-
-            self.optim.step()
-
-            running_loss += loss.item()
-            if (mark//4) and i % (mark//4) == (mark//4 - 1):
-                last_loss = running_loss / 1000
-                if debug:
-                    print(f'    batch {i+1:3d} loss: {last_loss}')
-                running_loss = 0.
-
-        return last_loss
-
-    def train(self, debug=False):
-
-        loss = [('epochs', 'train', 'validation')]
-
-
+    def epoch(self):
         self.model.train()
+        epoch_loss = 0.0
+        for batch_idx, (x, y) in enumerate(self.traindt):
+            x, y = x.to(self.device), y.to(self.device)
+            self.optimizer.zero_grad()
+            output = self.model(x)
+            loss = self.criter(output, y)
+            loss.backward()
+            self.optimizer.step()
+            epoch_loss += loss.item()
+        return epoch_loss/len(self.traindt.dataset)
 
-        for epoch in range(self.epochs):
-            if debug:
-                print(f'EPOCH {epoch+1}')
-
-            self.model.train(True)
-            avg_loss = self.one_epoch(debug)
-
-            if self.scheduler:
-                self.scheduler.step()
-
-            self.model.train(False)
-            running_vloss = 0.0
-            for vinputs, vlabels in self.validdt:
-                vinputs = vinputs.to(self.device)
-                vlabels = vlabels.to(self.device)
-
-                voutputs = self.model(vinputs)
-                vloss = self.criter(voutputs, vlabels)
-                running_vloss += vloss
-
-            avg_vloss = running_vloss / (len(self.validdt))
-
-            if debug:
-                print(f'LOSS train {avg_loss} valid {avg_vloss}')
-                loss.append((epoch, avg_loss, avg_vloss))
-
-        if isinstance(debug, str):
-            with open(debug, 'w') as f:
-                f.write(' '.join(loss[0]) + '\n')
-                f.write('\n'.join(map(lambda x: f'{x[0]} {x[1]:4.3f} {x[2]:4.3f}', loss[1:])))
-                f.write('\n')
+    def train(self):
+        metrics = []
+        print('epoch', 'train-loss', 'valid-loss', 'valid-acc')
+        for epoch in range(1, self.epochs + 1):
+            train_loss = self.epoch()
+            valid_acc, valid_loss = self.test(testloader=self.validdt)
+            self.scheduler.step()
+            metric = {
+                'epoch' : epoch,
+                'train-loss' : train_loss,
+                'valid-loss' : valid_loss, 
+                'valid-acc': valid_acc
+            }
+            metrics.append(metric)
+            print(f'{metric["epoch"]:2d} {metric["train-loss"]:10.5f} {metric["valid-loss"]:10.5f} {metric["valid-acc"]:10.5f}')
+        return metrics
 
     def test(self, testloader=None):
         '''Test model using function criterion.'''
 
-        self.model.train(False)
+        self.model.eval()
         testloader = testloader or self.testdt
         loss = 0.0
         acc  = 0.0
-        for features, target in testloader:
-                features, target = features.to(self.device), target.to(self.device)
-                output = self.model(features)
-                loss  += self.criter(output, target).item()
+        with torch.no_grad():
+            for x, y in testloader:
+                    x, y = x.to(self.device), y.to(self.device)
+                    output = self.model(x)
+                    loss  += self.criter(output, y).item()
 
-                pred   = output.data.max(1, keepdim=True)[1]
-                acc  += pred.eq(target.data.view_as(pred)).sum()
+                    pred   = output.argmax(1, keepdim=True)
+                    acc  += pred.eq(y.data.view_as(pred)).sum().item()
 
         size = len(testloader.dataset)
-        return { 'loss': loss/size, 'acc': acc/size}
+        return acc/size, loss/size
+
+class ModelConfigEnsemble:
+    def __init__(self, model, traindt, validdt, testdt, epochs):
+        self.model = model
+        self.traindt = traindt
+        self.validdt = validdt
+        self.testdt  = testdt
+        self.epochs  = epochs
+
+    def get_layers(self):
+        return []
+
+    def set_layers(self, trash):
+        return
+
+    def train(self, debug=False):
+        return self.model.fit(self.traindt, epochs=self.epochs)
+    
+    def test(self, debug=False):
+        acc, loss = self.model.evaluate(self.testdt, return_loss=True)
+        return acc/100, loss

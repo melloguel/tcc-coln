@@ -13,6 +13,9 @@ from torch.utils.data import random_split
 from torchvision.datasets import MNIST, CIFAR10
 from torchvision.transforms import ToTensor, Normalize, Compose
 from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+
+from wisconsin import WISCONSIN
 
 from mnist_smlp import mk_mnist_smlp
 from mnist_lmlp import mk_mnist_lmlp
@@ -21,6 +24,9 @@ from mnist_mmlp import mk_mnist_mmlp
 
 from cifar10_smlp import mk_cifar10_smlp
 from cifar10_conv import mk_cifar10_conv
+
+from wisconsin_smlp import mk_wisconsin_smlp
+from wisconsin_boost import mk_wisconsin_boost
 
 import coln
 import mean
@@ -33,14 +39,12 @@ def fetch_dataset(dataset, transforms):
                       download=True,
                       transform=transforms)
 
-    validdt = dataset(root='./data',
+    testdt = dataset(root='./data',
                       train=False,
                       download=True,
                       transform=transforms)
 
-    total = len(traindt)
-    traindt, testdt = random_split(
-        traindt, lengths=(total - total//6, total//6))
+    traindt, validdt = train_test_split(traindt, test_size=0.1)
     return traindt, validdt, testdt
 
 
@@ -53,28 +57,31 @@ def mkdl(dt, bs, train=False):
     return DataLoader(dt, batch_size=bs, shuffle=train)
 
 def mkdls_chaotic(traindt, validdt, testdt, splits, batchsize):
-    skip = 10//splits
+    nclasses = len(set([y for _, y in traindt]))
+    skip = nclasses//splits
     traindts = []
     validdts = []
     testdts  = []
     r = []
-    for i in range(0, 10, skip):
+    for i in range(0, nclasses, skip):
         pred = mkpred(i, skip)
         tr = list(filter(pred, traindt))
         tv = list(filter(pred, validdt))
         te = list(filter(pred, testdt))
         r.append(len(tr)/len(traindt))
         traindts.append(mkdl(tr, bs=batchsize, train=True))
-        validdts.append(mkdl(tv, bs=batchsize))
-        testdts.append(mkdl(te, bs=batchsize))
+        validdts.append(mkdl(tv, bs=1))
+        testdts.append(mkdl(te, bs=1000))
+ 
     return traindts, validdts, testdts, r
 
 def mkdls_uniform(traindt, validt, testdt, splits, batchsize):
+    nclasses = len(set([y for _, y in traindt]))
     data_sources = [traindt, validt, testdt]
     data_sources_groups = []
     # Split datasets by class
     for source in data_sources:
-        d = { label : [] for label in range(10) }
+        d = { label : [] for label in range(nclasses) }
         for data in source:
             feature, label = data
             d[label].append(data)
@@ -111,6 +118,7 @@ def mkdls_uniform(traindt, validt, testdt, splits, batchsize):
     return *ret, r
 
 
+#TODO: Remove
 def sanity_check_uniformity():
     tr, vl, ts = fetch_dataset(MNIST, [ToTensor()])
     for i in [2, 5, 10]:
@@ -154,15 +162,21 @@ def sanity_test(**kwargs):
                     mkdl(validdt, bs=batchsize),
                     mkdl(testdt, bs=batchsize),
                     device)
-    print('parameters', sum(map(prod, map(lambda x: x.shape, model.get_layers()))))
-    model.train(debug=testname+'.dat')
-    result = model.test()
-    for key, value in result.items():
-        result[key] = f'{value:3.3f}'
-    with open(testname+'-test.dat', 'w') as f:
-        writer = csv.DictWriter(f, fieldnames=result.keys(), delimiter=' ')
+    print('parameters', sum(map(prod, map(lambda x: x.shape, model.get_layers()))) or '-' )
+    metrics = model.train()
+    acc, loss = model.test()
+    print('loss:', loss, 'acc', acc)
+
+    with open(testname+'-test.csv', 'w') as f:
+        writer = csv.DictWriter(f, fieldnames=['acc', 'loss'])
         writer.writeheader()
-        writer.writerow(result)
+        writer.writerow({'acc': acc, 'loss': loss})
+
+    if metrics:
+        with open(testname+'.csv', 'w') as f:
+            writer = csv.DictWriter(f, metrics[0].keys())
+            writer.writeheader()
+            writer.writerows(metrics)
 
 
 def test(**kwargs):
@@ -175,10 +189,13 @@ def test(**kwargs):
     device     = kwargs['device']
     transforms = kwargs['transforms']
     combine    = kwargs['combine']
+    cases      = kwargs['cases']
+
+    if model([], [], [], 'cpu').get_layers() == []:
+        print("Model doesn't support get_layers()")
+        return
 
     traindt, validdt, testdt = fetch_dataset(dataset, transforms)
-
-    cases = {2: 5, 5: 30, 10: 60}
 
     for n, steps in cases.items():
         traindts, validdts, testdts, r = split(traindt, validdt, testdt, n, batchsize)
@@ -200,31 +217,16 @@ def test(**kwargs):
         print(f'DONE: {testname}-{n}')
 
 def main():
-    parser = argparse.ArgumentParser(description='Run CoLn tests.')
-    parser.add_argument('--dataset', type=str, required=True,
-                        help='dataset used for tests. Can be MNIST or CIFAR10.')
-    parser.add_argument('--model', type=str, required=True,
-                        help='model used in tests.')
-    parser.add_argument('--splitter', type=str, required=False, default="chaotic",
-                        help='how to split dataset for coln training. Can be "uniform" or "chaotic"')
-    parser.add_argument('--combine', type=str, required=False, default='coln',
-                        help='how to combine the models. Default: coln')
-    parser.add_argument('--check',
-                        action='store_true',
-                        help='''Test model with full dataset.\
-                        May be used to verfiy the neural network performance.''')
-    parser.add_argument('--batchsize', dest='batchsize', default=128, type=int,
-                        help="Batch size used during training, validation and testing.")
-    parser.add_argument('--no-gpu', action='store_true', help='Use CPU to train the model.')
-
     datasets = {
         'MNIST'  : MNIST,
-        'CIFAR10': CIFAR10
+        'CIFAR10': CIFAR10,
+        'WISCONSIN': WISCONSIN
     }
 
     transforms = {
-        'MNIST'   : [ToTensor()],
-        'CIFAR10' : [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        'MNIST'   : [ToTensor(), Normalize((0.1307,), (0.3081,))],
+        'CIFAR10' : [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))],
+        'WISCONSIN': [ToTensor()]
     }
 
     mnist_networks = {
@@ -236,13 +238,18 @@ def main():
 
     cifar10_networks = {
         'smlp' : mk_cifar10_smlp,
-        #'lmlp' : mk_cifar10_lmlp,
         'conv' : mk_cifar10_conv
+    }
+
+    wisconsin_networks = {
+        'smlp' : mk_wisconsin_smlp,
+        'boost' : mk_wisconsin_boost,
     }
 
     networks = {
         'MNIST': mnist_networks,
-        'CIFAR10' : cifar10_networks
+        'CIFAR10' : cifar10_networks,
+        'WISCONSIN' : wisconsin_networks,
     }
 
     splitters = {
@@ -255,13 +262,34 @@ def main():
         'mean' : mean.combine,
     }
 
+    cases = {
+        'MNIST'  : {2: 10, 5: 25, 10: 50},
+        'CIFAR10': {2: 10, 5: 25, 10: 50},
+        'WISCONSIN': {2 : 10}
+    }
+
+    parser = argparse.ArgumentParser(description='Run CoLn tests.')
+    parser.add_argument('--dataset', type=str, required=True,
+                        help='dataset used for tests. Can be: '+ ', '.join(datasets.keys()))
+    parser.add_argument('--model', type=str, required=True,
+                        help='model used in tests.')
+    parser.add_argument('--splitter', type=str, required=False, default="chaotic",
+                        help='how to split dataset for coln training. Can be: '+ ', '.join(splitters.keys()))
+    parser.add_argument('--combine', type=str, required=False, default='coln',
+                        help='how to combine the models. Default: coln')
+    parser.add_argument('--check', action='store_true',
+                        help='Test model with full dataset.')
+    parser.add_argument('--batchsize', dest='batchsize', default=64, type=int,
+                        help="Batch size used during training, validation and testing.")
+    parser.add_argument('--no-gpu', action='store_true', default=False, help='Use CPU to train the model.')
+
     args = parser.parse_args()
 
     try:
         dataset_name = args.dataset.upper()
         dataset = datasets[dataset_name]
     except KeyError:
-        print('dataset must be CIFAR10 or MNIST, got', dataset_name)
+        print(f'dataset {dataset_name} not found. Avaiable datasets are:', ', '.join(datasets.keys()))
         sys.exit(20)
 
     try:
@@ -293,10 +321,11 @@ def main():
         'dataset'    : dataset,
         'testname'   : testname,
         'batchsize'  : args.batchsize,
-        'device'     : "cuda" if not args.no_gpu else "cpu",
+        'device'     : torch.device("cpu" if args.no_gpu else "cuda"),
         'transforms' : transforms[dataset_name],
         'split'      : split,
         'combine'    : combine,
+        'cases'      : cases[dataset_name],
     }
 
     if args.check:
@@ -310,9 +339,13 @@ def main():
                  ('device', test_args['device']),
                  ('batch_size', test_args['batchsize']),
                  ('split', splitter),
-                 ('combine', combiner)]
+                 ('combine', combiner),
+                 ('cases', cases[dataset_name])]
         for name, value in items:
-            print(f"{name:<20} {value:<20}")
+            if isinstance(value, dict):
+                print(f"{name:<20}", ' '.join(map(lambda x: f"{x[0]}-{x[1]}", value.items())))
+            else:
+                print(f"{name:<20} {value:<20}")
 
         test(**test_args)
 

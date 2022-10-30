@@ -40,12 +40,16 @@ def mk_mnist_lmlp(traindt, validdt, testdt, device):
     criterion    = nn.NLLLoss()
     optim_params = { 'lr' : 0.01, 'momentum': 0.9}
     optimizer    = optim.SGD
+    scheduler = optim.lr_scheduler.StepLR
+    sched_params = { 'step_size' : 1, 'gamma' : 0.7 }
 
     return ModelConfig(
             model=LargeMLP(),
             criterion=criterion,
             optimizer=optimizer,
             optimizer_params=optim_params,
+            scheduler=scheduler,
+            scheduler_params=sched_params,
             traindt=traindt,
             validdt=validdt,
             testdt=testdt,

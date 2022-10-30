@@ -47,12 +47,16 @@ def mk_cifar10_conv(traindt, validdt, testdt, device):
     criterion = nn.NLLLoss(reduction='sum')
     optim_params = {}
     optimizer    = optim.Adadelta
+    scheduler    = optim.lr_scheduler.StepLR
+    sched_params = { 'step_size' : 1, 'gamma' : 0.7 }
 
     return ModelConfig(
             model=CIFAR10Conv(),
             criterion=criterion,
             optimizer=optimizer,
             optimizer_params=optim_params,
+            scheduler=scheduler,
+            scheduler_params=sched_params,
             traindt=traindt,
             validdt=validdt,
             testdt=testdt,
