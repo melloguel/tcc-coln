@@ -5,7 +5,7 @@ from torchinfo import summary
 
 from modelconfig import ModelConfig
 
-class SimpleMLP(nn.Module):
+class SMLP(nn.Module):
     def __init__(self):
         super().__init__()
         self.linear1 = nn.Linear(28*28, 100)
@@ -19,12 +19,11 @@ class SimpleMLP(nn.Module):
         a = self.relu(self.linear1(a))
         a = self.relu(self.linear2(a))
         a = self.final(a)
-        output = self.softmax(a)
-        return output
+        return a
 
 
 def mk_mnist_smlp(traindt, validdt, testdt, device):
-    epochs       = 15
+    epochs       = 10
     criterion    = nn.CrossEntropyLoss()
     optim_params = { 'lr' : 0.01, 'momentum' : 0.9 }
     optimizer    = optim.SGD
@@ -33,7 +32,7 @@ def mk_mnist_smlp(traindt, validdt, testdt, device):
 
 
     return ModelConfig(
-            model=SimpleMLP(),
+            model=SMLP(),
             criterion=criterion,
             optimizer=optimizer,
             optimizer_params=optim_params,
@@ -46,5 +45,5 @@ def mk_mnist_smlp(traindt, validdt, testdt, device):
             device=device)
 
 if __name__ == '__main__':
-    model = SimpleMLP()
+    model = SMLP()
     summary(model)

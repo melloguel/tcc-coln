@@ -9,8 +9,8 @@ from modelconfig import ModelConfig
 class SMLP(nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear1 = nn.Linear(30, 128)
-        self.linear2 = nn.Linear(128, 64)
+        self.linear1 = nn.Linear(30, 64)
+        self.linear2 = nn.Linear(64, 64)
         self.linear3 = nn.Linear(64, 32)
         self.linear4 = nn.Linear(32, 16)
         self.final   = nn.Linear(16, 2)
@@ -24,13 +24,11 @@ class SMLP(nn.Module):
     def forward(self, x):
         x = x.view(x.shape[0], -1)
         a = F.relu(self.linear1(x))
-        a = F.dropout(a, 0.25)
+        a = F.dropout(a, 0.1)
 
         a = F.relu(self.linear2(a))
-        a = F.dropout(a, 0.25)
 
         a = F.relu(self.linear3(a))
-        a = F.dropout(a, 0.25)
 
         a = F.relu(self.linear4(a))
         a = self.final(a)

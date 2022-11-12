@@ -25,9 +25,9 @@ class MMLP(nn.Module):
 
 
 def mk_mnist_mmlp(traindt, validdt, testdt, device):
-    epochs       = 15
+    epochs       = 20
     criterion    = nn.CrossEntropyLoss()
-    optim_params = { 'lr' : 0.05, 'momentum' : 0.09 }
+    optim_params = { 'lr' : 0.1, 'momentum' : 0.09 }
     optimizer    = optim.SGD
     scheduler    = optim.lr_scheduler.StepLR
     sched_params = { 'step_size' : 1, 'gamma' : 0.7 }

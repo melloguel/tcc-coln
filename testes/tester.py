@@ -21,11 +21,16 @@ from mnist_smlp import mk_mnist_smlp
 from mnist_lmlp import mk_mnist_lmlp
 from mnist_conv import mk_mnist_conv
 from mnist_mmlp import mk_mnist_mmlp
+from mnist_rnn  import mk_mnist_rnn
+from mnist_boost import mk_mnist_boost
 
 from cifar10_smlp import mk_cifar10_smlp
 from cifar10_conv import mk_cifar10_conv
+from cifar10_rnn  import mk_cifar10_rnn
+from cifar10_boost import mk_cifar10_boost
 
 from wisconsin_smlp import mk_wisconsin_smlp
+from wisconsin_rnn  import mk_wisconsin_rnn
 from wisconsin_boost import mk_wisconsin_boost
 
 import coln
@@ -69,10 +74,17 @@ def mkdls_chaotic(traindt, validdt, testdt, splits, batchsize):
         tv = list(filter(pred, validdt))
         te = list(filter(pred, testdt))
         r.append(len(tr)/len(traindt))
+
+        for i in range(0, nclasses):
+            pred = mkpred(i, 1)
+            cnt = len(list(filter(pred, tr)))
+            print(i, ':', cnt) if cnt > 0 else ...
+        print('---'*10)
+
         traindts.append(mkdl(tr, bs=batchsize, train=True))
-        validdts.append(mkdl(tv, bs=1))
-        testdts.append(mkdl(te, bs=1000))
- 
+        validdts.append(mkdl(tv, bs=batchsize))
+        testdts.append(mkdl(te, bs=batchsize))
+
     return traindts, validdts, testdts, r
 
 def mkdls_uniform(traindt, validt, testdt, splits, batchsize):
@@ -132,10 +144,10 @@ def sanity_check_uniformity():
 def mkhooks(storage, test_gl):
     def bhook(models):
         storage.append(
-            ' '.join(f'{model.test(test_gl)["acc"]:.4f}' for model in models))
+            ' '.join(f'{model.test(test_gl)[0]:.4f}' for model in models))
 
     def ahook(models):
-        storage[-1] += f' {models[0].test(test_gl)["acc"]:.4f}'
+        storage[-1] += f' {models[0].test(test_gl)[0]:.4f}'
         print(storage[-1])
 
     return bhook, ahook
@@ -218,8 +230,8 @@ def test(**kwargs):
 
 def main():
     datasets = {
-        'MNIST'  : MNIST,
-        'CIFAR10': CIFAR10,
+        'MNIST'    : MNIST,
+        'CIFAR10'  : CIFAR10,
         'WISCONSIN': WISCONSIN
     }
 
@@ -230,25 +242,30 @@ def main():
     }
 
     mnist_networks = {
-        'lmlp': mk_mnist_lmlp,
-        'smlp': mk_mnist_smlp,
-        'conv': mk_mnist_conv,
-        'mmlp': mk_mnist_mmlp,
+        'lmlp'  : mk_mnist_lmlp,
+        'smlp'  : mk_mnist_smlp,
+        'conv'  : mk_mnist_conv,
+        'mmlp'  : mk_mnist_mmlp,
+        'rnn'   : mk_mnist_rnn,
+        'boost' : mk_mnist_boost,
     }
 
     cifar10_networks = {
-        'smlp' : mk_cifar10_smlp,
-        'conv' : mk_cifar10_conv
+        'smlp'  : mk_cifar10_smlp,
+        'conv'  : mk_cifar10_conv,
+        'rnn'   : mk_cifar10_rnn,
+        'boost' : mk_cifar10_boost,
     }
 
     wisconsin_networks = {
-        'smlp' : mk_wisconsin_smlp,
+        'smlp'  : mk_wisconsin_smlp,
+        'rnn'   : mk_wisconsin_rnn,
         'boost' : mk_wisconsin_boost,
     }
 
     networks = {
-        'MNIST': mnist_networks,
-        'CIFAR10' : cifar10_networks,
+        'MNIST'     : mnist_networks,
+        'CIFAR10'   : cifar10_networks,
         'WISCONSIN' : wisconsin_networks,
     }
 
@@ -262,11 +279,13 @@ def main():
         'mean' : mean.combine,
     }
 
-    cases = {
-        'MNIST'  : {2: 10, 5: 25, 10: 50},
-        'CIFAR10': {2: 10, 5: 25, 10: 50},
-        'WISCONSIN': {2 : 10}
-    }
+    cases = {}
+    std = {2: 40, 5: 40, 10: 40}
+    for dataset_name in datasets.keys():
+        cases[dataset_name] = {}
+        cases[dataset_name]['uniform'] = std
+        cases[dataset_name]['chaotic'] = std
+    cases['WISCONSIN']['chaotic'] = { 2: 40 }
 
     parser = argparse.ArgumentParser(description='Run CoLn tests.')
     parser.add_argument('--dataset', type=str, required=True,
@@ -282,6 +301,8 @@ def main():
     parser.add_argument('--batchsize', dest='batchsize', default=64, type=int,
                         help="Batch size used during training, validation and testing.")
     parser.add_argument('--no-gpu', action='store_true', default=False, help='Use CPU to train the model.')
+
+    parser.add_argument('--clients', type=int, default=0, help='When not checking, number of clients')
 
     args = parser.parse_args()
 
@@ -313,19 +334,23 @@ def main():
         print(f'combine "{combiner}" not found. Available combine methods are:', ', '.join(combiners.keys()))
         sys.exit(23)
 
+    if args.clients:
+        cases[dataset_name][splitter] = { args.clients : 40 }
+
     testname = dataset_name.lower()+'-'+model_name.lower()
     if not args.check:
         testname += ('-'+args.splitter.lower()+'-'+args.combine.lower())
+    device = "cpu" if args.no_gpu else "cuda"
     test_args = {
         'model'      : model,
         'dataset'    : dataset,
         'testname'   : testname,
         'batchsize'  : args.batchsize,
-        'device'     : torch.device("cpu" if args.no_gpu else "cuda"),
+        'device'     : torch.device(device),
         'transforms' : transforms[dataset_name],
         'split'      : split,
         'combine'    : combine,
-        'cases'      : cases[dataset_name],
+        'cases'      : cases[dataset_name][splitter],
     }
 
     if args.check:
@@ -336,11 +361,11 @@ def main():
     else:
         items = [('model', model_name),
                  ('dataset', dataset_name),
-                 ('device', test_args['device']),
+                 ('device', device),
                  ('batch_size', test_args['batchsize']),
                  ('split', splitter),
                  ('combine', combiner),
-                 ('cases', cases[dataset_name])]
+                 ('cases', cases[dataset_name][splitter])]
         for name, value in items:
             if isinstance(value, dict):
                 print(f"{name:<20}", ' '.join(map(lambda x: f"{x[0]}-{x[1]}", value.items())))

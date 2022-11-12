@@ -32,10 +32,14 @@ class CIFAR10Conv(nn.Module):
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
+        x = F.dropout(x, 0.1)
         x = self.pool(F.relu(self.conv2(x)))
+        x = F.dropout(x, 0.2)
         x = self.pool(F.relu(self.conv3(x)))
+        x = F.dropout(x, 0.3)
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
+        x = F.dropout(x, 0.4)
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
         x = self.fc4(x)
@@ -43,7 +47,7 @@ class CIFAR10Conv(nn.Module):
         return output
 
 def mk_cifar10_conv(traindt, validdt, testdt, device):
-    epochs       = 12
+    epochs       = 30
     criterion = nn.NLLLoss(reduction='sum')
     optim_params = {}
     optimizer    = optim.Adadelta
