@@ -21,14 +21,16 @@ class ModelConfig(AbstractModel):
         self.scheduler   = self.scheduler(self.optimizer, **scheduler_params)
 
     def get_layers(self):
-        self.model.train(mode=False)
-        return list(self.model.parameters())
+        layers = []
+        for layer in self.model.parameters():
+            layers.append(layer.clone())
+        return layers
 
     def set_layers(self, new_layers):
-        old_layers = self.get_layers()
+        old_layers = self.model.parameters()
         with torch.no_grad():
             for old, new in zip(old_layers, new_layers):
-                old.copy_(new)
+                old.copy_(new.to(self.device))
 
     def epoch(self):
         self.model.train()
@@ -49,7 +51,7 @@ class ModelConfig(AbstractModel):
         for epoch in range(1, self.epochs + 1):
             train_loss = self.epoch()
             valid_acc, valid_loss = self.test(testloader=self.validdt)
-            self.scheduler.step()
+            #self.scheduler.step()
             metric = {
                 'epoch' : epoch,
                 'train-loss' : train_loss,
