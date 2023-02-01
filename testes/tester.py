@@ -25,11 +25,14 @@ from mnist_rnn  import mk_mnist_rnn
 from mnist_boost import mk_mnist_boost
 
 from cifar10_smlp import mk_cifar10_smlp
+from cifar10_mmlp import mk_cifar10_mmlp
 from cifar10_conv import mk_cifar10_conv
 from cifar10_rnn  import mk_cifar10_rnn
 from cifar10_boost import mk_cifar10_boost
 
 from wisconsin_smlp import mk_wisconsin_smlp
+from wisconsin_lmlp import mk_wisconsin_lmlp
+from wisconsin_mmlp import mk_wisconsin_mmlp
 from wisconsin_rnn  import mk_wisconsin_rnn
 from wisconsin_boost import mk_wisconsin_boost
 
@@ -252,6 +255,7 @@ def main():
 
     cifar10_networks = {
         'smlp'  : mk_cifar10_smlp,
+        'mmlp'  : mk_cifar10_mmlp,
         'conv'  : mk_cifar10_conv,
         'rnn'   : mk_cifar10_rnn,
         'boost' : mk_cifar10_boost,
@@ -259,6 +263,8 @@ def main():
 
     wisconsin_networks = {
         'smlp'  : mk_wisconsin_smlp,
+        'lmlp'  : mk_wisconsin_lmlp,
+        'mmlp'  : mk_wisconsin_mmlp,
         'rnn'   : mk_wisconsin_rnn,
         'boost' : mk_wisconsin_boost,
     }

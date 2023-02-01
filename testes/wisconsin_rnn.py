@@ -53,5 +53,5 @@ def mk_wisconsin_rnn(traindt, validdt, testdt, device):
             device=device)
 
 if __name__ == '__main__':
-    model = WISCONSINRNN(device)
+    model = WISCONSINRNN('cpu')
     summary(model)

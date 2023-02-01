@@ -17,7 +17,7 @@ def mk_cifar10_boost(traindt, validdt, testdt, device):
     ensemble.set_criterion(criterion)
     ensemble.set_optimizer( "Adam", lr=0.001, weight_decay=5e-4)
 
-    epochs = 10
+    epochs = 1
 
     return ModelConfigEnsemble(
            model=ensemble,

@@ -7,13 +7,12 @@ from torchinfo import summary
 
 from modelconfig import ModelConfig
 
-class SMLP(nn.Module):
+class MMLP(nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear1 = nn.Linear(32*32*3, 1000)
-        self.linear2 = nn.Linear(1000, 500)
-        self.linear3 = nn.Linear(500, 200)
-        self.linear4 = nn.Linear(200, 10)
+        self.linear1 = nn.Linear(32*32*3, 2000)
+        self.linear2 = nn.Linear(2000, 5000)
+        self.linear3 = nn.Linear(5000, 10)
 
     def forward(self, image):
         a = image.view(-1, 32*32*3)
@@ -22,13 +21,12 @@ class SMLP(nn.Module):
         a = relu(self.linear2(a))
         a = F.dropout(a, 0.4)
         a = relu(self.linear3(a))
-        a = relu(self.linear4(a))
         output = softmax(a, dim=1)
         return output
 
 
-def mk_cifar10_smlp(traindt, validdt, testdt, device):
-    epochs       = 16
+def mk_cifar10_mmlp(traindt, validdt, testdt, device):
+    epochs       = 20
     criterion    = nn.CrossEntropyLoss()
     optim_params = {'lr': 0.01, 'momentum': 0.9}
     optimizer    = optim.SGD
@@ -36,7 +34,7 @@ def mk_cifar10_smlp(traindt, validdt, testdt, device):
     sched_params = { 'step_size' : 1, 'gamma' : 0.7 }
 
     return ModelConfig(
-            model=SMLP(),
+            model=MMLP(),
             criterion=criterion,
             optimizer=optimizer,
             optimizer_params=optim_params,
@@ -49,5 +47,5 @@ def mk_cifar10_smlp(traindt, validdt, testdt, device):
             device=device)
 
 if __name__ == '__main__':
-    model = SMLP()
+    model = MMLP()
     summary(model)

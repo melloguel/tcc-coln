@@ -55,5 +55,5 @@ def mk_cifar10_rnn(traindt, validdt, testdt, device):
             device=device)
 
 if __name__ == '__main__':
-    model = CIFAR10RNN(device)
+    model = CIFAR10RNN('cpu')
     summary(model)

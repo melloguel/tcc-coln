@@ -53,5 +53,5 @@ def mk_mnist_rnn(traindt, validdt, testdt, device):
             device=device)
 
 if __name__ == '__main__':
-    model = MNISTRNN(device)
+    model = MNISTRNN('cpu')
     summary(model)
